@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Infrastructure Security Report — sample-infrastructure</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 14px; color: #404040; background: #F8F9FA; line-height: 1.6; }
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+.header { background: #1A3A5C; color: white; padding: 28px 32px; border-radius: 8px; margin-bottom: 20px; }
+.header h1 { font-size: 24px; font-weight: 700; }
+.header .sub { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 16px; }
+.meta-item { background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 4px; }
+.meta-item .label { font-size: 11px; text-transform: uppercase; opacity: 0.7; }
+.meta-item .value { font-weight: 600; font-size: 13px; word-break: break-all; }
+
+.status-bar { padding: 14px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
+.s-label { font-size: 20px; font-weight: 700; }
+.s-reason { font-size: 13px; }
+
+.grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 20px; }
+.card { background: white; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #E0E0E0; }
+.card .count { font-size: 36px; font-weight: 700; }
+.card .label { font-size: 12px; color: #595959; text-transform: uppercase; margin-top: 4px; }
+.card.critical .count { color: #7B1F1F; }
+.card.high .count { color: #7B3F00; }
+.card.medium .count { color: #7B4F00; }
+.card.info .count { color: #1A3A5C; }
+
+.section { background: white; border-radius: 8px; padding: 24px; margin-bottom: 20px; border: 1px solid #E0E0E0; }
+.section h2 { font-size: 18px; font-weight: 600; color: #1A3A5C; padding-bottom: 10px; border-bottom: 2px solid #D6E4F0; margin-bottom: 14px; }
+.section h3 { font-size: 14px; font-weight: 600; color: #595959; margin: 16px 0 8px; }
+
+.tool-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+.tool-card { border: 1px solid #E0E0E0; border-radius: 6px; padding: 16px; }
+.tool-card h3 { font-size: 14px; font-weight: 600; color: #2E75B6; margin: 0 0 10px; }
+.tool-card .row { font-size: 13px; color: #595959; margin: 3px 0; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #EBF3FA; color: #1A3A5C; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 2px solid #D6E4F0; }
+td { padding: 9px 12px; border-bottom: 1px solid #F0F0F0; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FAFAFA; }
+.mono { font-family: monospace; font-size: 12px; }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+.badge.critical { background: #FDECEA; color: #7B1F1F; }
+.badge.high     { background: #FFF0E0; color: #7B3F00; }
+.badge.medium   { background: #FFF3CD; color: #7B4F00; }
+.badge.low      { background: #E1F5EE; color: #1D6B5E; }
+.badge.warning  { background: #FFF3CD; color: #7B4F00; }
+.badge.passed   { background: #D4EDDA; color: #1E5631; }
+.badge.failed   { background: #FDECEA; color: #7B1F1F; }
+.badge.secret   { background: #FDECEA; color: #7B1F1F; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin: 2px; background: #EBF3FA; color: #1A3A5C; }
+.demo-banner { background: #FFF3CD; border: 1px solid #F0AD4E; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #7B4F00; }
+.demo-banner strong { font-weight: 700; }
+a { color: #2E75B6; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.footer { text-align: center; font-size: 12px; color: #888; margin-top: 20px; padding: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="demo-banner">
+    <strong>⚠️ Demo report.</strong> This is a sample output generated from the
+    <a href="https://github.com/r0ms3c/iac-security-pipeline">iac-security-pipeline</a>
+    against the included <code>sample-repo/</code> which contains intentional security issues.
+    All findings are real — produced by Trivy, Checkov, ansible-lint, tflint, and Hadolint.
+  </div>
+
+  <div class="header">
+    <h1>Infrastructure Security Report — sample-infrastructure</h1>
+    <div class="sub">IaC Security Pipeline · Executive Summary</div>
+    <div class="meta">
+      <div class="meta-item">
+        <div class="label">Repository</div>
+        <div class="value">your-username/sample-infrastructure</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Branch</div>
+        <div class="value">origin/main</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Commit</div>
+        <div class="value">6b25cb1263d0</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Build</div>
+        <div class="value">#3</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Scan date</div>
+        <div class="value">2026-05-04 15:50 UTC</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">IaC types detected</div>
+        <div class="value" style="font-size:11px;">
+          <span class="tag">Terraform</span>
+          <span class="tag">Ansible</span>
+          <span class="tag">Dockerfile</span>
+          <span class="tag">Kubernetes</span>
+          <span class="tag">Docker Compose</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar" style="background:#FDECEA;border-left:6px solid #7B1F1F;">
+    <div class="s-label" style="color:#7B1F1F;">FAILED ❌</div>
+    <div class="s-reason" style="color:#595959;">Checkov found 23 policy violations. | Hadolint found 4 Dockerfile warnings.</div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="grid4">
+    <div class="card critical">
+      <div class="count">0</div>
+      <div class="label">Critical CVEs</div>
+    </div>
+    <div class="card high">
+      <div class="count">0</div>
+      <div class="label">High CVEs</div>
+    </div>
+    <div class="card medium">
+      <div class="count">23</div>
+      <div class="label">Policy violations</div>
+    </div>
+    <div class="card info">
+      <div class="count">0</div>
+      <div class="label">Secrets detected</div>
+    </div>
+  </div>
+
+  <!-- Tool results -->
+  <div class="section">
+    <h2>Tool results</h2>
+    <div class="tool-grid">
+
+      <div class="tool-card">
+        <h3>Trivy</h3>
+        <div class="row"><span class="badge critical">CRITICAL</span> 0 critical CVEs</div>
+        <div class="row"><span class="badge high">HIGH</span> 0 high CVEs</div>
+        <div class="row"><span class="badge warning">WARNING</span> 7 misconfigurations</div>
+        <div class="row"><span class="badge secret">SECRET</span> 0 secrets</div>
+        <div style="margin-top:10px;font-size:12px;color:#888;">Scanned: Dockerfile · K8s YAML · Terraform · filesystem</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Checkov IaC</h3>
+        <div class="row"><span class="badge failed">FAILED</span> 23 violations</div>
+        <div class="row"><span class="badge passed">PASSED</span> 154 checks passed</div>
+        <div style="margin-top:6px;font-size:12px;color:#888;">Frameworks: Kubernetes · Dockerfile · Secrets · Ansible</div>
+      </div>
+
+      <div class="tool-card">
+        <h3>Linters</h3>
+        <div class="row"><span class="badge passed">PASSED</span> ansible-lint: 0 violations</div>
+        <div class="row"><span class="badge passed">PASSED</span> tflint: 0 issues</div>
+        <div class="row"><span class="badge warning">WARNING</span> Hadolint: 0 errors · 4 warnings</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Trivy findings detail -->
+  <div class="section">
+    <h2>Trivy — Misconfigurations (7 HIGH/CRITICAL)</h2>
+    <table>
+      <tr>
+        <th style="width:100px;">ID</th>
+        <th style="width:90px;">Severity</th>
+        <th style="width:160px;">Target</th>
+        <th>Title</th>
+      </tr>
+      <tr>
+        <td class="mono">DS-0002</td>
+        <td><span class="badge high">HIGH</span></td>
+        <td class="mono">Dockerfile</td>
+        <td>Image user should not be 'root'</td>
+      </tr>
+      <tr>
+        <td class="mono">DS-0029</td>
+        <td><span class="badge medium">MEDIUM</span></td>
+        <td class="mono">Dockerfile</td>
+        <td>'apt-get' missing '--no-install-recommends'</td>
+      </tr>
+      <tr>
+        <td class="mono">DS-0031</td>
+        <td><span class="badge high">HIGH</span></td>
+        <td class="mono">Dockerfile</td>
+        <td>Secrets passed via build-args or ENV or copied secret files</td>
+      </tr>
+      <tr>
+        <td class="mono">KSV-0014</td>
+        <td><span class="badge high">HIGH</span></td>
+        <td class="mono">deployment.yml</td>
+        <td>Root file system is not read-only</td>
+      </tr>
+      <tr>
+        <td class="mono">KSV-0017</td>
+        <td><span class="badge critical">CRITICAL</span></td>
+        <td class="mono">deployment.yml</td>
+        <td>Privileged container — runs with all Linux capabilities</td>
+      </tr>
+      <tr>
+        <td class="mono">KSV-0118</td>
+        <td><span class="badge medium">MEDIUM</span></td>
+        <td class="mono">deployment.yml</td>
+        <td>Default security context configured — explicit settings recommended</td>
+      </tr>
+      <tr>
+        <td class="mono">KSV-0020</td>
+        <td><span class="badge high">HIGH</span></td>
+        <td class="mono">deployment.yml</td>
+        <td>Runs as root user — specify runAsNonRoot: true</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Checkov detail -->
+  <div class="section">
+    <h2>Checkov — Policy violations (23 failed · 154 passed)</h2>
+
+    <h3>Kubernetes (19 violations)</h3>
+    <table>
+      <tr>
+        <th style="width:140px;">Check ID</th>
+        <th style="width:280px;">Resource</th>
+        <th>Check name</th>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_16</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Container should not be privileged</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_23</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Minimize the admission of root containers</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_11</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">CPU limits should be set</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_13</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Memory limits should be set</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_20</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Containers should not run with allowPrivilegeEscalation</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_22</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Use read-only filesystem for containers where possible</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_28</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Minimize the admission of containers with the NET_RAW capability</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_31</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Ensure that the seccomp profile is set to docker/default or runtime/default</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_K8S_35</td>
+        <td class="mono" style="font-size:11px;">Deployment.sample-app.sample-app</td>
+        <td style="font-size:12px;">Prefer using secrets as files over secrets as environment variables</td>
+      </tr>
+      <tr>
+        <td colspan="3" style="text-align:center;color:#888;font-size:12px;font-style:italic;">...and 10 more Kubernetes violations</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top:20px;">Dockerfile (2 violations)</h3>
+    <table>
+      <tr>
+        <th style="width:140px;">Check ID</th>
+        <th style="width:280px;">Resource</th>
+        <th>Check name</th>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_DOCKER_2</td>
+        <td class="mono" style="font-size:11px;">/Dockerfile</td>
+        <td style="font-size:12px;">Ensure that HEALTHCHECK instructions have been added to container images</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_DOCKER_3</td>
+        <td class="mono" style="font-size:11px;">/Dockerfile</td>
+        <td style="font-size:12px;">Ensure that a user for the container has been created</td>
+      </tr>
+    </table>
+
+    <h3 style="margin-top:20px;">Secrets (2 violations)</h3>
+    <table>
+      <tr>
+        <th style="width:140px;">Check ID</th>
+        <th style="width:280px;">File</th>
+        <th>Finding</th>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_SECRET_6</td>
+        <td class="mono" style="font-size:11px;">/deployment.yml L36-37</td>
+        <td style="font-size:12px;color:#7B1F1F;font-weight:600;">Base64 high entropy string — likely hardcoded credential</td>
+      </tr>
+      <tr>
+        <td class="mono" style="font-size:11px;">CKV_SECRET_6</td>
+        <td class="mono" style="font-size:11px;">/site.yml L19-20</td>
+        <td style="font-size:12px;color:#7B1F1F;font-weight:600;">Base64 high entropy string — likely hardcoded credential</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Linter results -->
+  <div class="section">
+    <h2>Linter results</h2>
+    <table>
+      <tr>
+        <th style="width:160px;">Tool</th>
+        <th style="width:120px;">Status</th>
+        <th>Summary</th>
+      </tr>
+      <tr>
+        <td><strong>ansible-lint</strong></td>
+        <td><span class="badge passed">PASSED</span></td>
+        <td style="font-size:12px;">0 violations — all Ansible playbooks and roles are compliant</td>
+      </tr>
+      <tr>
+        <td><strong>tflint</strong></td>
+        <td><span class="badge passed">PASSED</span></td>
+        <td style="font-size:12px;">0 issues — Terraform configurations are syntactically valid</td>
+      </tr>
+      <tr>
+        <td><strong>Hadolint</strong></td>
+        <td><span class="badge warning">WARNING</span></td>
+        <td style="font-size:12px;">4 warnings in Dockerfile — DL3008 (unpinned packages), DL3009 (apt lists not cleaned), DL3025 (shell form CMD), SC2086 (unquoted variable)</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Scan metadata -->
+  <div class="section">
+    <h2>Scan metadata</h2>
+    <table>
+      <tr><th style="width:200px;">Item</th><th>Value</th></tr>
+      <tr><td>Repository</td><td>sample-infrastructure</td></tr>
+      <tr><td>Path</td><td>your-username/sample-infrastructure</td></tr>
+      <tr><td>Commit SHA</td><td class="mono">6b25cb1263d06c9fea9de931bd55efeeb06b114f</td></tr>
+      <tr><td>Branch</td><td>origin/main</td></tr>
+      <tr><td>Scan date</td><td>2026-05-04 15:50:22 UTC</td></tr>
+      <tr><td>Build</td><td>#3</td></tr>
+      <tr><td>Pipeline status</td><td><span class="badge failed">FAILED</span></td></tr>
+      <tr><td>IaC types detected</td><td>
+        <span class="tag">Terraform</span>
+        <span class="tag">Ansible</span>
+        <span class="tag">Dockerfile</span>
+        <span class="tag">Kubernetes</span>
+        <span class="tag">Docker Compose</span>
+      </td></tr>
+      <tr><td>Trivy version</td><td class="mono">0.58.1</td></tr>
+      <tr><td>Checkov version</td><td class="mono">3.2.526</td></tr>
+      <tr><td>ansible-lint version</td><td class="mono">24.12.2</td></tr>
+      <tr><td>tflint version</td><td class="mono">0.54.0</td></tr>
+      <tr><td>Hadolint version</td><td class="mono">2.12.0</td></tr>
+    </table>
+  </div>
+
+  <div class="footer">
+    Generated by the <a href="https://github.com/r0ms3c/iac-security-pipeline">IaC Security Pipeline</a>
+    &nbsp;·&nbsp; Jenkins Build #3 &nbsp;·&nbsp; 2026-05-04 15:50 UTC
+  </div>
+
+</div>
+</body>
+</html>
