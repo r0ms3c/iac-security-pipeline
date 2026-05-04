@@ -1,0 +1,45 @@
+# IaC Security Pipeline — .gitignore
+
+# Tool output — never commit scan results
+trivy-report.json
+checkov-report.json
+ansible-lint-report.json
+tflint-report.json
+hadolint-report.json
+results_*.json
+
+# Generated HTML reports
+infra-security-report.html
+trivy-detail.html
+checkov-detail.html
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+output/
+
+# Secrets — never commit
+*.env
+.env*
+secrets.*
+*_password.txt
+*_key.txt
+*.pem
+*.p12
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

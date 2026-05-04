@@ -1,0 +1,242 @@
+# IaC Security Pipeline
+
+> Automated security scanning for Infrastructure as Code — Terraform, Ansible, Dockerfiles, Kubernetes, and Docker Compose — integrated with Jenkins and GitLab.
+
+[![Tools](https://img.shields.io/badge/Tools-Trivy%20%7C%20Checkov%20%7C%20ansible--lint%20%7C%20tflint%20%7C%20Hadolint-blue)](#tools)
+[![Platform](https://img.shields.io/badge/Platform-Jenkins%20%7C%20GitLab-orange)](#architecture)
+[![Languages](https://img.shields.io/badge/IaC-Terraform%20%7C%20Ansible%20%7C%20Docker%20%7C%20Kubernetes-green)](#detection)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
+
+---
+
+## What this is
+
+A shared Jenkins pipeline that automatically scans infrastructure repositories for security issues on every push. No per-repository configuration needed — the pipeline detects IaC types automatically and runs the appropriate tools.
+
+This is the companion to the [DevSecOps Application Security Pipeline](https://github.com/yourusername/devsecops-pipeline). While that pipeline scans application code (PHP, .NET, Node.js), this one scans the infrastructure that runs it.
+
+---
+
+## What it finds
+
+| Tool | Scans | Example findings |
+|---|---|---|
+| **Trivy** | Dockerfiles, K8s YAML, Terraform, filesystem | Base image CVEs · secrets in ENV vars · container running as root |
+| **Checkov** | Terraform, Ansible, K8s, Compose, Dockerfile | No resource limits · privileged containers · secrets in base64 |
+| **ansible-lint** | Ansible playbooks and roles | Deprecated syntax · missing become_user · risky file permissions |
+| **tflint** | Terraform configurations | Naming violations · deprecated resources · missing required fields |
+| **Hadolint** | Dockerfiles | Shell form CMD · missing HEALTHCHECK · apt without version pinning |
+
+---
+
+## Architecture
+
+```
+Infrastructure repository (any)
+        │
+        │ git push
+        ▼
+GitLab webhook
+        │
+        ▼
+Jenkins (shared pipeline)
+        │
+        ├── Checkout infra repo
+        ├── Detect IaC types automatically
+        │     ├── *.tf found          → HAS_TERRAFORM=true
+        │     ├── YAML with hosts:    → HAS_ANSIBLE=true
+        │     ├── Dockerfile*         → HAS_DOCKERFILE=true
+        │     ├── YAML with apiVersion: → HAS_KUBERNETES=true
+        │     └── docker-compose*.yml  → HAS_COMPOSE=true
+        │
+        ├── Trivy        (all repos — CVEs + misconfigs + secrets)
+        ├── Checkov      (all repos — IaC policy violations)
+        ├── ansible-lint (Ansible only)
+        ├── tflint       (Terraform only)
+        ├── Hadolint     (Dockerfiles only)
+        │
+        ├── Generate 3 HTML reports
+        │     ├── infra-security-report.html  (executive summary)
+        │     ├── trivy-detail.html           (full CVE + misconfiguration list)
+        │     └── checkov-detail.html         (all policy violations)
+        │
+        └── Security Gate
+              ├── CRITICAL CVEs → FAIL
+              ├── Secrets detected → FAIL
+              ├── Checkov violations > threshold → FAIL
+              └── ansible-lint errors → FAIL
+```
+
+---
+
+## Pipeline stages
+
+| Stage | Description | Condition |
+|---|---|---|
+| 1 · Validate | Check parameters, no spaces in REPO_NAME | Always |
+| 2 · Checkout | Copy helper scripts, fetch infra repo | Always |
+| 3 · Detect IaC | Set HAS_* flags from file inspection | Always |
+| 4 · Trivy | CVEs, misconfigs, secrets | Always |
+| 5 · Checkov | IaC policy violations | Always |
+| 6 · ansible-lint | Playbook quality and security | HAS_ANSIBLE=true |
+| 7 · tflint | Terraform syntax and best practices | HAS_TERRAFORM=true |
+| 8 · Hadolint | Dockerfile best practices | HAS_DOCKERFILE=true |
+| 9 · Generate report | 3 HTML files archived in Jenkins | Always |
+| 10 · Security Gate | Pass/fail based on tool thresholds | Always |
+
+---
+
+## Security Gate thresholds
+
+| Tool | Blocks pipeline |
+|---|---|
+| Trivy | CRITICAL CVEs > 0 or secrets detected > 0 |
+| Checkov | Violations > 10 (configurable) |
+| ansible-lint | Error-level violations > 0 |
+| Hadolint | Error-level violations > 0 |
+| tflint | Informative only — does not block |
+
+All thresholds are configurable in the Jenkinsfile.
+
+---
+
+## Onboarding a new infrastructure repository
+
+Three steps, approximately 10 minutes:
+
+**1 — Create the Jenkins job**
+
+New Item → Pipeline. Add three String Parameters:
+
+| Parameter | Description | Example |
+|---|---|---|
+| `REPO_NAME` | Repository name, no spaces | `my-infrastructure` |
+| `GITLAB_PROJECT_ID` | Numeric GitLab project ID | `42` |
+| `GITLAB_REPO_PATH` | Path after the domain | `group/my-infrastructure` |
+
+Pipeline section: point to this repository, branch `*/main`, script path `Jenkinsfile`.
+
+**2 — Add a stub Jenkinsfile to the infrastructure repository**
+
+```
+// Infrastructure security pipeline — managed centrally by the security team.
+// Do not modify this file. Contact the security team for pipeline changes.
+// Pipeline source: <your-gitlab>/security-pipeline/infra-security-pipeline
+```
+
+**3 — Add a GitLab webhook**
+
+Settings → Webhooks → Add webhook:
+- URL: `http://<jenkins>:8080/project/<job-name>`
+- Secret token: your shared webhook token
+- Events: Push + Merge Request
+
+Test → should return HTTP 200.
+
+---
+
+## Repository structure
+
+```
+iac-security-pipeline/
+├── Jenkinsfile                     # 10-stage shared pipeline
+├── generate-infra-report.py        # HTML report generator
+├── scripts/
+│   ├── merge-checkov.py            # Aggregate Checkov per-framework results
+│   └── merge-hadolint.py           # Aggregate Hadolint per-Dockerfile results
+├── rules/
+│   └── custom-checkov-policies/    # Organisation-specific Checkov policies
+├── sample-repo/                    # Sample infrastructure with intentional issues
+│   ├── terraform/
+│   ├── ansible/
+│   ├── docker/
+│   └── kubernetes/
+└── docs/
+    ├── architecture.md
+    ├── tools.md
+    ├── onboarding.md
+    └── troubleshooting.md
+```
+
+---
+
+## Tools installation
+
+All tools run on the Jenkins server. See [docs/tools.md](docs/tools.md) for installation instructions.
+
+| Tool | Install method | Location |
+|---|---|---|
+| Trivy | apt repository | `/usr/local/bin/trivy` |
+| Checkov | Python venv | `/opt/checkov-env/` |
+| ansible-lint | Python venv | `/opt/ansible-env/` |
+| tflint | Binary release | `/usr/local/bin/tflint` |
+| Hadolint | Binary release | `/usr/local/bin/hadolint` |
+
+---
+
+## Findings posted to GitLab
+
+After every push, each tool that finds issues posts a separate comment on the GitLab commit:
+
+```
+### Trivy Security Scan
+
+**Status: WARNING**
+
+#### Misconfigurations — 7 HIGH/CRITICAL
+
+- **DS-0002** | Dockerfile | Image user should not be 'root'
+- **DS-0031** | Dockerfile | Secrets passed via build-args or envs
+- **KSV-0017** | deployment.yml | Privileged container
+
+---
+_See trivy-detail.html in Jenkins artifacts for full report._
+```
+
+---
+
+## Suppressing false positives
+
+Each tool supports inline suppression:
+
+**Checkov** — `.checkov.yaml` in repo root:
+```yaml
+skip-checks:
+  - CKV_K8S_43  # Image digest not required for internal registries
+```
+
+**Hadolint** — inline comment:
+```dockerfile
+# hadolint ignore=DL3008
+RUN apt-get install -y mypackage
+```
+
+**ansible-lint** — inline comment:
+```yaml
+- name: Task name  # noqa: risky-file-permissions
+```
+
+**Trivy** — `.trivyignore` in repo root:
+```
+CVE-2024-12345  # Confirmed not applicable — internal network only
+```
+
+---
+
+## Sample infrastructure repository
+
+The `sample-repo/` directory contains a complete set of infrastructure files with intentional security issues — one for each tool to detect. Use it to verify the pipeline is working correctly after installation.
+
+See [sample-repo/README.md](sample-repo/README.md) for a full list of intentional issues and what each tool should find.
+
+---
+
+## Related
+
+- [devsecops-pipeline](https://github.com/yourusername/devsecops-pipeline) — Application security pipeline (Semgrep · Dependency-Check · SonarQube)
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)

@@ -1,0 +1,141 @@
+---
+# ============================================================
+# Sample Infrastructure — Ansible Playbook
+# Server hardening and application deployment
+# Note: contains intentional issues for pipeline testing
+# ============================================================
+
+- name: Harden and configure application servers
+  hosts: app_servers
+  become: true
+  # SECURITY ISSUE: should specify become_user explicitly
+  gather_facts: true
+
+  vars:
+    app_name: "sample-app"
+    app_port: 8080
+    # SECURITY ISSUE: hardcoded credentials in playbook
+    db_password: "Password123!"
+    app_secret_key: "mysecretkey12345"
+    deploy_user: "appuser"
+
+  pre_tasks:
+    - name: Update apt cache
+      # SECURITY ISSUE: using deprecated apt module syntax
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  tasks:
+
+    # ── System hardening ────────────────────────────────────────────────────
+    - name: Ensure SSH root login is disabled
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin no"
+        state: present
+      notify: Restart SSH
+
+    - name: Ensure SSH password authentication is disabled
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: Restart SSH
+
+    - name: Set SSH idle timeout
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^ClientAliveInterval"
+        line: "ClientAliveInterval 300"
+        state: present
+
+    - name: Install required packages
+      apt:
+        name:
+          - fail2ban
+          - ufw
+          - unattended-upgrades
+          - auditd
+        state: present
+
+    - name: Enable UFW firewall
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Allow SSH through firewall
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
+    - name: Allow application port through firewall
+      ufw:
+        rule: allow
+        port: "{{ app_port }}"
+        proto: tcp
+
+    # ── Application deployment ───────────────────────────────────────────────
+    - name: Create application user
+      user:
+        name: "{{ deploy_user }}"
+        shell: /bin/bash
+        # SECURITY ISSUE: creating user with sudo privileges
+        groups: sudo
+        append: true
+
+    - name: Create application directory
+      file:
+        path: "/opt/{{ app_name }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        # SECURITY ISSUE: directory permissions too open
+        mode: "0777"
+
+    - name: Write application configuration
+      template:
+        src: app-config.j2
+        dest: "/opt/{{ app_name }}/config.json"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0644"
+
+    - name: Write environment file
+      copy:
+        # SECURITY ISSUE: writing secrets directly to file
+        content: |
+          DB_PASSWORD={{ db_password }}
+          SECRET_KEY={{ app_secret_key }}
+          APP_PORT={{ app_port }}
+        dest: "/opt/{{ app_name }}/.env"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0644"
+
+    # ── Monitoring ───────────────────────────────────────────────────────────
+    - name: Enable auditd service
+      service:
+        name: auditd
+        state: started
+        enabled: true
+
+    - name: Configure unattended upgrades
+      copy:
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+              "${distro_id}:${distro_codename}-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        mode: "0644"
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: sshd
+        state: restarted

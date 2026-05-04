@@ -1,0 +1,132 @@
+# ============================================================
+# Sample Infrastructure — Kubernetes Manifests
+# Application deployment
+# Note: contains intentional issues for pipeline testing
+# ============================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-app
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: sample-app
+data:
+  APP_PORT: "8080"
+  LOG_LEVEL: "debug"
+  # SECURITY ISSUE: sensitive data in ConfigMap (should use Secret)
+  DB_HOST: "db-service"
+  API_ENDPOINT: "http://internal-api:8080"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: sample-app
+type: Opaque
+data:
+  # SECURITY ISSUE: base64 is not encryption — anyone can decode these
+  # Values are base64 of: Password123! and mysecretkey12345
+  db-password: UGFzc3dvcmQxMjMh
+  secret-key: bXlzZWNyZXRrZXkxMjM0NQ==
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-app
+  namespace: sample-app
+  labels:
+    app: sample-app
+    version: "1.0"
+spec:
+  # SECURITY ISSUE: no replica count specified (defaults to 1 — no HA)
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sample-app
+  template:
+    metadata:
+      labels:
+        app: sample-app
+    spec:
+      # SECURITY ISSUE: no serviceAccountName specified (uses default)
+      containers:
+        - name: app
+          image: sample-app:latest
+          # SECURITY ISSUE: using latest tag — not reproducible
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-password
+          securityContext:
+            # SECURITY ISSUE: running as root
+            runAsUser: 0
+            # SECURITY ISSUE: privileged container
+            privileged: true
+            # SECURITY ISSUE: allowing privilege escalation
+            allowPrivilegeEscalation: true
+            # SECURITY ISSUE: writable root filesystem
+            readOnlyRootFilesystem: false
+          # SECURITY ISSUE: no resource limits
+          # resources:
+          #   limits:
+          #     cpu: "500m"
+          #     memory: "512Mi"
+          # SECURITY ISSUE: no liveness or readiness probes
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+      volumes:
+        - name: config
+          configMap:
+            name: app-config
+      # SECURITY ISSUE: hostNetwork enabled
+      hostNetwork: false
+      # SECURITY ISSUE: hostPID enabled
+      hostPID: false
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+  namespace: sample-app
+spec:
+  selector:
+    app: sample-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  # SECURITY ISSUE: LoadBalancer type exposes to external network
+  type: LoadBalancer
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all
+  namespace: sample-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SECURITY ISSUE: allow all ingress — no network segmentation
+    - {}
+  egress:
+    # SECURITY ISSUE: allow all egress — no outbound restrictions
+    - {}
